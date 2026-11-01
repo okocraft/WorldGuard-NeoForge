@@ -1,0 +1,38 @@
+name: Build
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: worldguard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build and test
+        run: chmod +x gradlew && ./gradlew build --no-daemon --console=plain
+      - name: Boot packaged WorldGuard and WorldEdit
+        timeout-minutes: 7
+        run: node src/test/node/server-smoke.mjs
+      - name: Test real DQM effects against protected regions
+        timeout-minutes: 12
+        run: node src/test/node/dqm-effects-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: WorldGuard-NeoForge
+          path: |
+            build/libs/*.jar
+            build/test-results/test/
+            build/smoke/server-output*.log
+            build/dqm-effects/server-output*.log
+          if-no-files-found: warn

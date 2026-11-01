@@ -1,7 +1,10 @@
 package de.kuro.worldguard.platform;
 
 import com.sk89q.worldedit.neoforge.NeoForgeAdapter;
-import com.sk89q.worldedit.neoforge.NeoForgePlayer;
+import com.sk89q.worldedit.coremc.internal.CoreMcPlayer;
+import com.sk89q.worldedit.neoforge.internal.NeoForgeWorldEdit;
+import net.minecraft.world.clock.ClockNetworkState;
+import net.minecraft.world.level.storage.LevelData;
 import com.sk89q.worldedit.util.Location;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldedit.world.weather.WeatherType;
@@ -9,6 +12,7 @@ import com.sk89q.worldedit.world.weather.WeatherTypes;
 import com.sk89q.worldedit.world.gamemode.GameMode;
 import com.sk89q.worldedit.world.gamemode.GameModes;
 import com.sk89q.worldguard.LocalPlayer;
+import de.kuro.worldguard.mixin.FoodDataAccessor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -24,7 +28,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.players.UserBanListEntry;
 import net.minecraft.world.level.GameType;
 
-public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPlayer {
+public final class NeoForgeLocalPlayer extends CoreMcPlayer implements LocalPlayer {
     private final ServerPlayer player;
     private final NeoForgeWorldGuardPlatform platform;
     private WeatherType weatherOverride;
@@ -33,7 +37,7 @@ public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPl
     private boolean applyingRegionGameMode;
 
     NeoForgeLocalPlayer(ServerPlayer player, NeoForgeWorldGuardPlatform platform) {
-        super(player);
+        super(NeoForgeWorldEdit.getPlatform(), player);
         this.player = player;
         this.platform = platform;
     }
@@ -44,10 +48,10 @@ public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPl
 
     @Override
     public boolean setLocation(Location location) {
-        ServerLevel target = NeoForgeAdapter.adapt((World) location.getExtent());
+        ServerLevel target = NeoForgeAdapter.get().toNativeWorld((World) location.getExtent());
         player.teleportTo(target, location.getX(), location.getY(), location.getZ(),
-                location.getYaw(), location.getPitch());
-        return player.serverLevel() == target && Math.abs(player.getX() - location.getX()) < 0.01
+                java.util.Set.of(), location.getYaw(), location.getPitch(), false);
+        return player.level() == target && Math.abs(player.getX() - location.getX()) < 0.01
                 && Math.abs(player.getY() - location.getY()) < 0.01
                 && Math.abs(player.getZ() - location.getZ()) < 0.01;
     }
@@ -93,8 +97,8 @@ public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPl
 
     @Override
     public void ban(String message) {
-        player.server.getPlayerList().getBans().add(new UserBanListEntry(
-                player.getGameProfile(), null, "WorldGuard", null, message));
+        player.level().getServer().getPlayerList().getBans().add(new UserBanListEntry(
+                player.nameAndId(), null, "WorldGuard", null, message));
         kick(message);
     }
 
@@ -135,12 +139,12 @@ public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPl
 
     @Override
     public float getExhaustion() {
-        return player.getFoodData().getExhaustionLevel();
+        return ((FoodDataAccessor) (Object) player.getFoodData()).getExhaustionLevel();
     }
 
     @Override
     public void setExhaustion(float exhaustion) {
-        player.getFoodData().setExhaustion(exhaustion);
+        ((FoodDataAccessor) (Object) player.getFoodData()).setExhaustion(exhaustion);
     }
 
     @Override
@@ -158,7 +162,7 @@ public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPl
     @Override
     public void resetPlayerWeather() {
         weatherOverride = null;
-        sendWeather(player.serverLevel().getRainLevel(1), player.serverLevel().getThunderLevel(1));
+        sendWeather(player.level().getRainLevel(1), player.level().getThunderLevel(1));
     }
 
     private void sendWeather(float rain, float thunder) {
@@ -193,9 +197,7 @@ public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPl
     public void resetPlayerTime() {
         timeOverride = null;
         relativeTime = true;
-        player.connection.send(new ClientboundSetTimePacket(player.serverLevel().getGameTime(),
-                player.serverLevel().getDayTime(), player.serverLevel().getGameRules().getBoolean(
-                        net.minecraft.world.level.GameRules.RULE_DAYLIGHT)));
+        player.connection.send(player.level().clockManager().createFullSyncPacket());
     }
 
     @Override
@@ -210,8 +212,10 @@ public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPl
 
     @Override
     public void setCompassTarget(Location location) {
-        BlockPos target = NeoForgeAdapter.toBlockPos(location.toVector().toBlockPoint());
-        player.connection.send(new net.minecraft.network.protocol.game.ClientboundSetDefaultSpawnPositionPacket(target, 0));
+        BlockPos target = NeoForgeAdapter.get().toBlockPos(location.toVector().toBlockPoint());
+        player.connection.send(new net.minecraft.network.protocol.game.ClientboundSetDefaultSpawnPositionPacket(
+                LevelData.RespawnData.of(NeoForgeAdapter.get().toNativeWorld((World) location.getExtent()).dimension(),
+                        target, 0, 0)));
     }
 
     @Override
@@ -237,10 +241,17 @@ public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPl
 
     private void syncTimeView() {
         if (timeOverride == null) return;
-        long dayTime = relativeTime ? player.serverLevel().getDayTime() + timeOverride : timeOverride;
-        player.connection.send(new ClientboundSetTimePacket(player.serverLevel().getGameTime(), dayTime,
-                relativeTime && player.serverLevel().getGameRules().getBoolean(
-                        net.minecraft.world.level.GameRules.RULE_DAYLIGHT)));
+        var clock = player.level().dimensionType().defaultClock();
+        if (clock.isEmpty()) return;
+        var packet = player.level().clockManager().createFullSyncPacket();
+        var clocks = new java.util.HashMap<>(packet.clockUpdates());
+        var current = clocks.get(clock.get());
+        if (current == null) return;
+        clocks.put(clock.get(), new ClockNetworkState(
+                relativeTime ? current.totalTicks() + timeOverride : timeOverride,
+                relativeTime ? current.partialTick() : 0,
+                relativeTime ? current.rate() : 0));
+        player.connection.send(new ClientboundSetTimePacket(packet.gameTime(), clocks));
     }
 
     private static Component legacy(String input) {
@@ -252,8 +263,7 @@ public final class NeoForgeLocalPlayer extends NeoForgePlayer implements LocalPl
             ChatFormatting format = ChatFormatting.getByCode(input.charAt(i + 1));
             if (format == null) continue;
             if (i > start) result.append(Component.literal(input.substring(start, i)).withStyle(style));
-            style = format == ChatFormatting.RESET ? Style.EMPTY
-                    : format.isColor() ? Style.EMPTY.applyFormat(format) : style.applyFormat(format);
+            style = style.applyLegacyFormat(format);
             start = ++i + 1;
         }
         if (start < input.length()) result.append(Component.literal(input.substring(start)).withStyle(style));

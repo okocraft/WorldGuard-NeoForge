@@ -13,10 +13,12 @@ import de.kuro.worldguard.platform.NeoForgeWorldGuardPlatform;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public final class SessionMovement {
@@ -27,7 +29,7 @@ public final class SessionMovement {
 
     private record BlockLocation(ServerLevel level, int x, int y, int z) {
         static BlockLocation of(ServerPlayer player) {
-            return new BlockLocation(player.serverLevel(), player.getBlockX(), player.getBlockY(), player.getBlockZ());
+            return new BlockLocation(player.level(), player.getBlockX(), player.getBlockY(), player.getBlockZ());
         }
     }
 
@@ -43,9 +45,9 @@ public final class SessionMovement {
     public void forget(ServerPlayer player) { observed.remove(player.getUUID()); }
 
     public Location packetMove(ServerPlayer player, double x, double y, double z, float yaw, float pitch) {
-        if (!active() || correcting || !player.server.isSameThread()
+        if (!active() || correcting || !player.level().getServer().isSameThread()
                 || !platform.getGlobalStateManager().usePlayerMove
-                || !platform.getGlobalStateManager().get(platform.adaptWorld(player.serverLevel())).useRegions
+                || !platform.getGlobalStateManager().get(platform.adaptWorld(player.level())).useRegions
                 || !Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
                 || Mth.floor(x) == player.getBlockX() && Mth.floor(y) == player.getBlockY()
                 && Mth.floor(z) == player.getBlockZ()) return null;
@@ -53,19 +55,19 @@ public final class SessionMovement {
                 : player.isSwimming() ? MoveType.SWIM : player.isPassenger() ? MoveType.RIDE : MoveType.MOVE;
         LocalPlayer local = platform.adapt(player);
         return platform.getSessionManager().get(local).testMoveTo(local,
-                new Location(platform.adaptWorld(player.serverLevel()), x, y, z, yaw, pitch), type);
+                new Location(platform.adaptWorld(player.level()), x, y, z, yaw, pitch), type);
     }
 
     public void observedTick(ServerPlayer player) {
         if (!active()) return;
         BlockLocation previous = observed.get(player.getUUID());
-        if (previous != null && previous.level() == player.serverLevel()
+        if (previous != null && previous.level() == player.level()
                 && previous.x() == player.getBlockX() && previous.y() == player.getBlockY()
                 && previous.z() == player.getBlockZ()) return;
         observed.put(player.getUUID(), BlockLocation.of(player));
         if (previous == null || correcting
                 || !platform.getGlobalStateManager().usePlayerMove
-                || !platform.getGlobalStateManager().get(platform.adaptWorld(player.serverLevel())).useRegions) return;
+                || !platform.getGlobalStateManager().get(platform.adaptWorld(player.level())).useRegions) return;
         LocalPlayer local = platform.adapt(player);
         MoveType type = player.isPassenger() ? MoveType.RIDE : MoveType.TELEPORT;
         Location denied = platform.getSessionManager().get(local).testMoveTo(local, local.getLocation(), type);
@@ -76,7 +78,7 @@ public final class SessionMovement {
         if (!active() || correcting || event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)
                 || !platform.getGlobalStateManager().usePlayerTeleports) return true;
         LocalPlayer local = platform.adapt(player);
-        World world = platform.adaptWorld(player.serverLevel());
+        World world = platform.adaptWorld(player.level());
         if (!platform.getGlobalStateManager().get(world).useRegions) return true;
         Location from = local.getLocation();
         Location to = new Location(world, event.getTargetX(), event.getTargetY(), event.getTargetZ(),
@@ -85,7 +87,8 @@ public final class SessionMovement {
             RegionQuery query = platform.getRegionContainer().createQuery();
             if (event instanceof EntityTeleportEvent.EnderPearl) {
                 if (!teleportFlag(local, query, from, to, Flags.ENDERPEARL)) return false;
-            } else if (event instanceof EntityTeleportEvent.ChorusFruit) {
+            } else if (event instanceof EntityTeleportEvent.ItemConsumption consumption
+                    && consumption.getConsumedItem().is(Items.CHORUS_FRUIT)) {
                 if (!teleportFlag(local, query, from, to, Flags.CHORUS_TELEPORT)) return false;
             }
         }
@@ -129,13 +132,13 @@ public final class SessionMovement {
     private void correct(ServerPlayer player, Location previous) {
         correcting = true;
         try {
-            ServerLevel level = NeoForgeAdapter.adapt((World) previous.getExtent());
-            if (player.serverLevel() == level) {
+            ServerLevel level = NeoForgeAdapter.get().toNativeWorld((World) previous.getExtent());
+            if (player.level() == level) {
                 player.connection.teleport(previous.getX(), previous.getY(), previous.getZ(),
                         previous.getYaw(), previous.getPitch());
             } else {
                 player.teleportTo(level, previous.getX(), previous.getY(), previous.getZ(),
-                        previous.getYaw(), previous.getPitch());
+                        Set.of(), previous.getYaw(), previous.getPitch(), false);
             }
             observe(player);
         } finally {

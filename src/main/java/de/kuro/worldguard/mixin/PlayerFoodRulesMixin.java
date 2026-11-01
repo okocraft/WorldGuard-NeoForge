@@ -1,7 +1,7 @@
 package de.kuro.worldguard.mixin;
 
 import de.kuro.worldguard.protection.SessionPlayerFlagsListener;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.food.FoodData;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -22,7 +22,7 @@ public abstract class PlayerFoodRulesMixin {
     @Unique private float worldguard$exhaustionBefore;
 
     @Inject(method = "tick", at = @At("HEAD"))
-    private void worldguard$beforeFoodTick(Player player, CallbackInfo ci) {
+    private void worldguard$beforeFoodTick(ServerPlayer player, CallbackInfo ci) {
         worldguard$preserveFood = !SessionPlayerFlagsListener.naturalHunger(player);
         if (worldguard$preserveFood) {
             worldguard$foodBefore = foodLevel;
@@ -32,19 +32,19 @@ public abstract class PlayerFoodRulesMixin {
     }
 
     @Redirect(method = "tick", at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/world/entity/player/Player;heal(F)V"))
-    private void worldguard$naturalRegeneration(Player player, float amount) {
+            target = "Lnet/minecraft/server/level/ServerPlayer;heal(F)V"))
+    private void worldguard$naturalRegeneration(ServerPlayer player, float amount) {
         if (SessionPlayerFlagsListener.naturalHealth(player)) player.heal(amount);
     }
 
     @Redirect(method = "tick", at = @At(value = "INVOKE",
             target = "Lnet/minecraft/world/food/FoodData;addExhaustion(F)V"))
-    private void worldguard$naturalRegenExhaustion(FoodData food, float amount, Player player) {
+    private void worldguard$naturalRegenExhaustion(FoodData food, float amount, ServerPlayer player) {
         if (SessionPlayerFlagsListener.naturalHealth(player)) food.addExhaustion(amount);
     }
 
     @Inject(method = "tick", at = @At("TAIL"))
-    private void worldguard$afterFoodTick(Player player, CallbackInfo ci) {
+    private void worldguard$afterFoodTick(ServerPlayer player, CallbackInfo ci) {
         if (worldguard$preserveFood) {
             foodLevel = Math.max(foodLevel, worldguard$foodBefore);
             saturationLevel = Math.max(saturationLevel, worldguard$saturationBefore);

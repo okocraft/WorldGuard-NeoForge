@@ -115,7 +115,7 @@ public final class ProtectionDecisionService {
             query.clear();
             Location target = location(pos);
             boolean allowed = query.testBuild(target, local, flags)
-                    && query.queryState(new Location(platform.adaptWorld(player.serverLevel()),
+                    && query.queryState(new Location(platform.adaptWorld(player.level()),
                             player.getBlockX(), player.getBlockY(), player.getBlockZ()),
                             local, flags) != StateFlag.State.DENY
                     && query.queryState(target, local, flags) != StateFlag.State.DENY;

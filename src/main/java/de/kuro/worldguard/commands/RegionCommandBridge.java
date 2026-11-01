@@ -103,7 +103,7 @@ public final class RegionCommandBridge {
     private int execute(CommandContext<CommandSourceStack> context, String alias, String raw) {
         CommandSourceStack source = context.getSource();
         Actor actor = source.getPlayer() != null ? platform.adapt(source.getPlayer())
-                : NeoForgeAdapter.adaptCommandSource(source);
+                : NeoForgeAdapter.get().adaptCommandSource(source);
         String[] args = raw.isBlank() ? new String[0] : raw.split(" ", -1);
         try {
             if (Set.of("wg", "worldguard").contains(alias) && args.length > 0
@@ -168,13 +168,13 @@ public final class RegionCommandBridge {
                 : context.getNodes().get(0).getNode().getName();
         if (FIRE_ALIASES.contains(rootAlias)) {
             for (var level : context.getSource().getServer().getAllLevels()) {
-                add(target, current, level.dimension().location().toString());
+                add(target, current, level.dimension().identifier().toString());
             }
             return target.buildFuture();
         }
         if (GENERAL_ALIASES.contains(rootAlias)) {
             for (var player : context.getSource().getServer().getPlayerList().getPlayers()) {
-                add(target, current, player.getGameProfile().getName());
+                add(target, current, player.getGameProfile().name());
             }
             return target.buildFuture();
         }
@@ -185,7 +185,7 @@ public final class RegionCommandBridge {
             children.keySet().stream().sorted().forEach(value -> add(target, current, value));
         } else if (lastCompleted.equals("-w")) {
             for (var level : context.getSource().getServer().getAllLevels()) {
-                add(target, current, level.dimension().location().toString());
+                add(target, current, level.dimension().identifier().toString());
             }
         } else if (lastCompleted.equals("-g") && (subcommand.equals("flag") || subcommand.equals("f"))) {
             for (RegionGroup group : RegionGroup.values()) {
@@ -194,7 +194,7 @@ public final class RegionCommandBridge {
         } else if (positionals.isEmpty() && REGION_ARGUMENTS.contains(subcommand)) {
             if (context.getSource().getPlayer() != null) {
                 RegionManager manager = platform.getRegionContainer().get(
-                        NeoForgeAdapter.adapt(context.getSource().getPlayer().serverLevel()));
+                        NeoForgeAdapter.get().fromNativeWorld(context.getSource().getPlayer().level()));
                 if (manager != null) {
                     manager.getRegions().keySet().stream().sorted().forEach(value -> add(target, current, value));
                 }
@@ -206,7 +206,7 @@ public final class RegionCommandBridge {
             }
         } else if (!positionals.isEmpty() && PLAYER_ARGUMENTS.contains(subcommand)) {
             for (var player : context.getSource().getServer().getPlayerList().getPlayers()) {
-                add(target, current, player.getGameProfile().getName());
+                add(target, current, player.getGameProfile().name());
             }
         }
         return target.buildFuture();

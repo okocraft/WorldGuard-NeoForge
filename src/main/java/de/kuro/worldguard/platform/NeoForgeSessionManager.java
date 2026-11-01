@@ -38,7 +38,7 @@ final class NeoForgeSessionManager extends AbstractSessionManager {
                     .getDeclaredField("uuid");
             cacheKeyUuid.setAccessible(true);
         } catch (ReflectiveOperationException error) {
-            throw new IllegalStateException("WorldGuard Core 7.0.12 session cache layout changed", error);
+            throw new IllegalStateException("WorldGuard Core 7.0.19 session cache layout changed", error);
         }
         super.registerHandler(TimedSessionActivity.FACTORY, null);
         super.registerHandler(NaturalPlayerState.FACTORY, null);
@@ -74,7 +74,7 @@ final class NeoForgeSessionManager extends AbstractSessionManager {
         if (session == null || session.hasBypassDisabled()) {
             return false;
         }
-        String dimension = NeoForgeAdapter.adapt(world).dimension().location().toString();
+        String dimension = NeoForgeAdapter.get().toNativeWorld(world).dimension().identifier().toString();
         if (WorldGuard.getInstance().getPlatform().getGlobalStateManager().disablePermissionCache) {
             return player.hasPermission("worldguard.region.bypass." + dimension);
         }

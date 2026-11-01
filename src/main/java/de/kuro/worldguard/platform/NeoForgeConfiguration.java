@@ -144,7 +144,7 @@ final class NeoForgeConfiguration extends ConfigurationManager {
     @Override
     public WorldConfiguration get(World world) {
         if (world == null) return defaultConfiguration;
-        String id = NeoForgeRegionContainer.storageId(NeoForgeAdapter.adapt(world));
+        String id = NeoForgeRegionContainer.storageId(NeoForgeAdapter.get().toNativeWorld(world));
         return getForDimensionId(id);
     }
 

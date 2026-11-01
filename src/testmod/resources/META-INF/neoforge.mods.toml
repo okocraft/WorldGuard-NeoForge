@@ -1,0 +1,37 @@
+modLoader = "javafml"
+loaderVersion = "[11,)"
+license = "LGPL-3.0-or-later"
+
+[[mods]]
+modId = "worldguard_test"
+version = "1.0"
+displayName = "WorldGuard Protection Event Test"
+description = '''Dedicated-server protection integration test.'''
+
+[[dependencies.worldguard_test]]
+modId = "neoforge"
+type = "required"
+versionRange = "[26.2.0.88,26.3)"
+ordering = "NONE"
+side = "SERVER"
+
+[[dependencies.worldguard_test]]
+modId = "minecraft"
+type = "required"
+versionRange = "[26.2,26.3)"
+ordering = "NONE"
+side = "SERVER"
+
+[[dependencies.worldguard_test]]
+modId = "worldedit"
+type = "required"
+versionRange = "[7.4.5,7.5)"
+ordering = "AFTER"
+side = "SERVER"
+
+[[dependencies.worldguard_test]]
+modId = "worldguard"
+type = "required"
+versionRange = "[7.0,)"
+ordering = "AFTER"
+side = "SERVER"

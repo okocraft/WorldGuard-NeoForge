@@ -21,25 +21,25 @@ import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.decoration.ItemFrame;
-import net.minecraft.world.entity.decoration.Painting;
+import net.minecraft.world.entity.decoration.painting.Painting;
 import net.minecraft.world.entity.item.PrimedTnt;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.entity.monster.Ravager;
-import net.minecraft.world.entity.monster.Slime;
-import net.minecraft.world.entity.monster.Zombie;
-import net.minecraft.world.entity.MobSpawnType;
-import net.minecraft.world.entity.animal.SnowGolem;
-import net.minecraft.world.entity.projectile.AbstractHurtingProjectile;
-import net.minecraft.world.entity.projectile.WitherSkull;
-import net.minecraft.world.entity.vehicle.MinecartTNT;
+import net.minecraft.world.entity.monster.cubemob.Slime;
+import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.animal.golem.SnowGolem;
+import net.minecraft.world.entity.projectile.hurtingprojectile.AbstractHurtingProjectile;
+import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
+import net.minecraft.world.entity.vehicle.minecart.MinecartTNT;
 import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.block.piston.PistonStructureResolver;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.GrowingPlantHeadBlock;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.world.entity.projectile.windcharge.BreezeWindCharge;
-import net.minecraft.world.entity.projectile.windcharge.WindCharge;
+import net.minecraft.world.entity.projectile.hurtingprojectile.windcharge.BreezeWindCharge;
+import net.minecraft.world.entity.projectile.hurtingprojectile.windcharge.WindCharge;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.EntityInvulnerabilityCheckEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
@@ -223,7 +223,7 @@ public final class EnvironmentalProtectionListener {
 
     @SubscribeEvent
     public void onFinalizeSpawn(FinalizeSpawnEvent event) {
-        if (event.isCanceled() || event.getSpawnType() != MobSpawnType.NATURAL
+        if (event.isCanceled() || event.getSpawnType() != EntitySpawnReason.NATURAL
                 || !(event.getEntity() instanceof Slime)
                 || !(event.getEntity().level() instanceof ServerLevel level) || !protection.active()) return;
         if (event.getY() >= 60 && protection.config(level).blockGroundSlimes) {
@@ -248,10 +248,10 @@ public final class EnvironmentalProtectionListener {
         if (attacker == null) attacker = damage.getDirectEntity();
         if (!(attacker instanceof Mob) && !damage.is(DamageTypes.WITHER)
                 || attacker instanceof TamableAnimal) return;
-        WorldConfiguration cfg = protection.config(player.serverLevel());
+        WorldConfiguration cfg = protection.config(player.level());
         if (cfg.disableMobDamage) { event.setCanceled(true); return; }
         if (cfg.useRegions) {
-            EnvironmentalProtection.Context context = protection.context(player.serverLevel());
+            EnvironmentalProtection.Context context = protection.context(player.level());
             if (!context.query().getApplicableRegions(context.location(player.blockPosition()))
                     .testState(protection.player(player), Flags.MOB_DAMAGE)) event.setCanceled(true);
         }

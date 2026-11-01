@@ -13,6 +13,9 @@ logoFile = "worldguard-logo.png"
 [[mixins]]
 config = "worldguard.mixins.json"
 
+[[mixins]]
+config = "worldguard.dqm.mixins.json"
+
 [[dependencies.${mod_id}]]
 modId = "neoforge"
 type = "required"
@@ -30,6 +33,13 @@ side = "BOTH"
 [[dependencies.${mod_id}]]
 modId = "worldedit"
 type = "required"
-versionRange = "[7.3.8,7.3.9)"
+versionRange = "[7.4.5,7.5)"
 ordering = "AFTER"
 side = "BOTH"
+
+[[dependencies.${mod_id}]]
+modId = "luckperms"
+type = "optional"
+versionRange = "[5.5,)"
+ordering = "AFTER"
+side = "SERVER"

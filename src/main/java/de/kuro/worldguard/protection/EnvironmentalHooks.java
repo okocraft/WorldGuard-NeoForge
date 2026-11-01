@@ -10,7 +10,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.projectile.ThrownPotion;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownSplashPotion;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.tags.FluidTags;
@@ -21,6 +21,7 @@ import net.minecraft.world.level.material.FluidState;
 public final class EnvironmentalHooks {
     private static EnvironmentalProtection protection;
     private static ProtectionDecisionService decisions;
+    private static EntityProtectionListener entityPermissions;
     private static final StateFlag[] FROST = {Flags.FROSTED_ICE_FORM};
     private static final StateFlag[] POTION = {Flags.POTION_SPLASH};
     private static final StateFlag[] DRIPLEAF = {Flags.USE_DRIPLEAF};
@@ -29,11 +30,20 @@ public final class EnvironmentalHooks {
 
     private EnvironmentalHooks() {}
 
-    public static void install(EnvironmentalProtection service, ProtectionDecisionService playerDecisions) {
+    public static void install(EnvironmentalProtection service, ProtectionDecisionService playerDecisions,
+                               EntityProtectionListener entityProtection) {
         protection = service;
         decisions = playerDecisions;
+        entityPermissions = entityProtection;
     }
-    public static void uninstall() { protection = null; decisions = null; }
+    public static void uninstall() { protection = null; decisions = null; entityPermissions = null; }
+
+    /** Player-caused status and burning effects share ordinary damage permissions. */
+    public static boolean offensiveEffect(Entity caster, LivingEntity target) {
+        if (decisions == null || !decisions.active()) return true;
+        ServerPlayer player = EntityCauseResolver.player(caster);
+        return player == null || entityPermissions.permitsDamage(player, target, player.damageSources().magic());
+    }
 
     public static boolean fluid(LevelAccessor access, BlockPos source, BlockPos target,
                                 BlockState oldState, FluidState fluid) {
@@ -104,10 +114,10 @@ public final class EnvironmentalHooks {
     public static boolean showDeathMessage(ServerPlayer player) {
         EnvironmentalProtection service = protection;
         return service == null || !service.active()
-                || !service.config(player.serverLevel()).disableDeathMessages;
+                || !service.config(player.level()).disableDeathMessages;
     }
 
-    public static boolean potionSplash(ThrownPotion potion, LivingEntity target) {
+    public static boolean potionSplash(ThrownSplashPotion potion, LivingEntity target) {
         EnvironmentalProtection service = protection;
         if (service == null || !service.active() || !(potion.level() instanceof ServerLevel level)) return true;
         if (potion.getOwner() instanceof ServerPlayer player && decisions != null) {
@@ -156,7 +166,7 @@ public final class EnvironmentalHooks {
         EnvironmentalProtection.Context context = service.context(level);
         WorldConfiguration cfg = context.config();
         if (actor instanceof net.minecraft.world.entity.monster.EnderMan && cfg.disableEndermanGriefing
-                || actor instanceof net.minecraft.world.entity.animal.SnowGolem && cfg.disableSnowmanTrails) return false;
+                || actor instanceof net.minecraft.world.entity.animal.golem.SnowGolem && cfg.disableSnowmanTrails) return false;
         RegionAssociable cause = context.source(actor.blockPosition());
         return context.state(target, flag)
                 && context.build(target, cause, place ? Flags.BLOCK_PLACE : Flags.BLOCK_BREAK);

@@ -28,7 +28,7 @@ public final class BlockedPotionListener {
                 || platform.getRegionContainer() == null) return;
         ItemStack stack = event.getItemStack();
         if (!(stack.getItem() instanceof PotionItem)) return;
-        Set<String> blocked = platform.blockedPotionEffects(player.serverLevel());
+        Set<String> blocked = platform.blockedPotionEffects(player.level());
         if (blocked.isEmpty()) return;
         PotionContents contents = stack.getOrDefault(DataComponents.POTION_CONTENTS, PotionContents.EMPTY);
         String matched = null;
@@ -42,7 +42,7 @@ public final class BlockedPotionListener {
         if (matched == null) return;
         boolean thrown = stack.is(Items.SPLASH_POTION) || stack.is(Items.LINGERING_POTION);
         boolean bypass = platform.adapt(player).hasPermission("worldguard.override.potions");
-        if (bypass && !(thrown && platform.blockPotionsAlways(player.serverLevel()))) return;
+        if (bypass && !(thrown && platform.blockPotionsAlways(player.level()))) return;
         player.sendSystemMessage(Component.literal("Sorry, potions with " + matched
                 + " are presently disabled."));
         event.setCancellationResult(InteractionResult.FAIL);
