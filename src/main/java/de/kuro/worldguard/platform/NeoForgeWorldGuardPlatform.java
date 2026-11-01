@@ -87,7 +87,7 @@ public final class NeoForgeWorldGuardPlatform implements WorldGuardPlatform {
 
     /** Reuse the WorldEdit world wrapper on frequent player protection checks. */
     public World adaptWorld(ServerLevel level) {
-        return worlds.computeIfAbsent(level, NeoForgeAdapter::adapt);
+        return worlds.computeIfAbsent(level, NeoForgeAdapter.get()::fromNativeWorld);
     }
 
     public java.util.Set<String> blockedPotionEffects(ServerLevel level) {
@@ -110,7 +110,7 @@ public final class NeoForgeWorldGuardPlatform implements WorldGuardPlatform {
     }
 
     public void rememberProfile(ServerPlayer player) {
-        Profile profile = new Profile(player.getUUID(), player.getGameProfile().getName());
+        Profile profile = new Profile(player.getUUID(), player.getGameProfile().name());
         if (knownProfiles != null) knownProfiles.remember(profile);
         ProfileCache cache = WorldGuard.getInstance().getProfileCache();
         if (cache != null) cache.put(profile);
@@ -170,9 +170,9 @@ public final class NeoForgeWorldGuardPlatform implements WorldGuardPlatform {
             regions.unload(world);
         }
         if (configuration != null) {
-            configuration.unloadDimension(NeoForgeRegionContainer.storageId(NeoForgeAdapter.adapt(world)));
+            configuration.unloadDimension(NeoForgeRegionContainer.storageId(NeoForgeAdapter.get().toNativeWorld(world)));
         }
-        worlds.remove(NeoForgeAdapter.adapt(world));
+        worlds.remove(NeoForgeAdapter.get().toNativeWorld(world));
     }
 
     public void loadChunk(ServerLevel level, int x, int z) {

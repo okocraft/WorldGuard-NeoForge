@@ -77,7 +77,7 @@ final class NeoForgeStringMatcher implements StringMatcher {
         if (filter.equals("#world") && source instanceof NeoForgeLocalPlayer sourcePlayer) {
             List<LocalPlayer> matches = new ArrayList<>();
             for (LocalPlayer player : platform.onlinePlayers()) {
-                if (((NeoForgeLocalPlayer) player).getHandle().serverLevel() == sourcePlayer.getHandle().serverLevel()) {
+                if (((NeoForgeLocalPlayer) player).getHandle().level() == sourcePlayer.getHandle().level()) {
                     matches.add(player);
                 }
             }
@@ -87,7 +87,7 @@ final class NeoForgeStringMatcher implements StringMatcher {
             List<LocalPlayer> matches = new ArrayList<>();
             for (LocalPlayer player : platform.onlinePlayers()) {
                 NeoForgeLocalPlayer candidate = (NeoForgeLocalPlayer) player;
-                if (candidate.getHandle().serverLevel() == sourcePlayer.getHandle().serverLevel()
+                if (candidate.getHandle().level() == sourcePlayer.getHandle().level()
                         && candidate.getHandle().distanceToSqr(sourcePlayer.getHandle()) <= 900) {
                     matches.add(candidate);
                 }
@@ -101,7 +101,7 @@ final class NeoForgeStringMatcher implements StringMatcher {
     public Actor matchPlayerOrConsole(Actor sender, String filter) throws CommandException {
         if (filter.equals("!") || filter.equalsIgnoreCase("#console")
                 || filter.equalsIgnoreCase("*console")) {
-            return NeoForgeAdapter.adaptCommandSource(platform.server().createCommandSourceStack());
+            return NeoForgeAdapter.get().adaptCommandSource(platform.server().createCommandSourceStack());
         }
         return matchSinglePlayer(sender, filter);
     }
@@ -111,8 +111,8 @@ final class NeoForgeStringMatcher implements StringMatcher {
     public World getWorldByName(String worldName) {
         ServerLevel nameMatch = null;
         for (ServerLevel level : platform.server().getAllLevels()) {
-            if (level.dimension().location().toString().equalsIgnoreCase(worldName)) {
-                return NeoForgeAdapter.adapt(level);
+            if (level.dimension().identifier().toString().equalsIgnoreCase(worldName)) {
+                return NeoForgeAdapter.get().fromNativeWorld(level);
             }
             if (((ServerLevelData) level.getLevelData()).getLevelName().equalsIgnoreCase(worldName)) {
                 if (nameMatch != null) {
@@ -121,7 +121,7 @@ final class NeoForgeStringMatcher implements StringMatcher {
                 nameMatch = level;
             }
         }
-        return nameMatch == null ? null : NeoForgeAdapter.adapt(nameMatch);
+        return nameMatch == null ? null : NeoForgeAdapter.get().fromNativeWorld(nameMatch);
     }
 
     @Override
@@ -130,8 +130,8 @@ final class NeoForgeStringMatcher implements StringMatcher {
                 .replace("%id%", sender.getUniqueId().toString())
                 .replace("%online%", Integer.toString(platform.server().getPlayerCount()));
         if (sender instanceof LocalPlayer player) {
-            result = result.replace("%world%", NeoForgeAdapter.adapt((World) player.getLocation().getExtent())
-                            .dimension().location().toString())
+            result = result.replace("%world%", NeoForgeAdapter.get().toNativeWorld((World) player.getLocation().getExtent())
+                            .dimension().identifier().toString())
                     .replace("%health%", Double.toString(player.getHealth()));
         }
         return result;

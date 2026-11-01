@@ -27,24 +27,21 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.util.BlockSnapshot;
-import net.neoforged.neoforge.common.util.TriState;
+import net.minecraft.util.TriState;
 import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
 import net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
 
 public final class BlacklistProtectionListener {
     private static BlacklistProtectionListener installed;
     private final NeoForgeWorldGuardPlatform platform;
-    private final EntityInteractionPair entityInteractions = new EntityInteractionPair();
 
     public BlacklistProtectionListener(NeoForgeWorldGuardPlatform platform) {
         this.platform = platform;
         installed = this;
     }
-
-    public void forget(ServerPlayer player) { entityInteractions.forget(player); }
-    public void clear() { entityInteractions.clear(); }
 
     private Blacklist rules(ServerLevel level) {
         return platform.getRegionContainer() == null || !platform.hasBlacklistRules() ? null
@@ -67,7 +64,7 @@ public final class BlacklistProtectionListener {
     }
 
     @SubscribeEvent
-    public void onBreak(BlockEvent.BreakEvent event) {
+    public void onBreak(BreakBlockEvent event) {
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)
                 || !(event.getLevel() instanceof ServerLevel level)) return;
         Blacklist rules = rules(level);
@@ -76,11 +73,13 @@ public final class BlacklistProtectionListener {
         BlockTarget target = block(event.getState());
         if (target != null && !rules.check(new BlockBreakBlacklistEvent(actor, at(event.getPos()), target), false, false)) {
             event.setCanceled(true);
+            event.setNotifyClient(true);
             return;
         }
         ItemTarget tool = item(player.getMainHandItem());
         if (tool != null && !rules.check(new ItemDestroyWithBlacklistEvent(actor, at(event.getPos()), tool), false, false)) {
             event.setCanceled(true);
+            event.setNotifyClient(true);
         }
     }
 
@@ -111,11 +110,11 @@ public final class BlacklistProtectionListener {
     @SubscribeEvent
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        Blacklist rules = rules(player.serverLevel());
+        Blacklist rules = rules(player.level());
         if (rules == null) return;
         LocalPlayer actor = platform.adapt(player);
         BlockPos pos = event.getPos();
-        BlockTarget target = block(player.serverLevel().getBlockState(pos));
+        BlockTarget target = block(player.level().getBlockState(pos));
         if (target != null && !rules.check(new BlockInteractBlacklistEvent(actor, at(pos), target), false, false)) {
             deny(event);
             return;
@@ -129,7 +128,7 @@ public final class BlacklistProtectionListener {
     @SubscribeEvent
     public void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        Blacklist rules = rules(player.serverLevel());
+        Blacklist rules = rules(player.level());
         if (rules == null) return;
         ItemTarget target = item(event.getItemStack());
         if (target != null && !rules.check(new ItemUseBlacklistEvent(platform.adapt(player),
@@ -142,26 +141,14 @@ public final class BlacklistProtectionListener {
     @SubscribeEvent
     public void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        if (entityInteractions.alreadyChecked(player, event.getTarget(), event.getHand())) return;
         if (!checkEntityItemUse(player, event.getItemStack(), event.getTarget().blockPosition())) {
             event.setCancellationResult(InteractionResult.FAIL);
             event.setCanceled(true);
-        }
-    }
-
-    @SubscribeEvent
-    public void onEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific event) {
-        if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!checkEntityItemUse(player, event.getItemStack(), event.getTarget().blockPosition())) {
-            event.setCancellationResult(InteractionResult.FAIL);
-            event.setCanceled(true);
-        } else {
-            entityInteractions.record(player, event.getTarget(), event.getHand());
         }
     }
 
     private boolean checkEntityItemUse(ServerPlayer player, ItemStack stack, BlockPos pos) {
-        Blacklist rules = rules(player.serverLevel());
+        Blacklist rules = rules(player.level());
         if (rules == null) return true;
         ItemTarget target = item(stack);
         return target == null || rules.check(new ItemUseBlacklistEvent(platform.adapt(player),
@@ -171,7 +158,7 @@ public final class BlacklistProtectionListener {
     @SubscribeEvent
     public void onDrop(ItemTossEvent event) {
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)) return;
-        Blacklist rules = rules(player.serverLevel());
+        Blacklist rules = rules(player.level());
         if (rules == null) return;
         ItemTarget target = item(event.getEntity().getItem());
         if (target != null && !rules.check(new ItemDropBlacklistEvent(platform.adapt(player),
@@ -181,7 +168,7 @@ public final class BlacklistProtectionListener {
     @SubscribeEvent
     public void onPickup(ItemEntityPickupEvent.Pre event) {
         if (!(event.getPlayer() instanceof ServerPlayer player) || event.canPickup() == TriState.FALSE) return;
-        Blacklist rules = rules(player.serverLevel());
+        Blacklist rules = rules(player.level());
         if (rules == null) return;
         ItemTarget target = item(event.getItemEntity().getItem());
         if (target != null && !rules.check(new ItemAcquireBlacklistEvent(platform.adapt(player),

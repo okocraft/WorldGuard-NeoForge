@@ -4,7 +4,7 @@ import com.sk89q.worldguard.commands.CommandUtils;
 import com.sk89q.worldguard.config.WorldConfiguration;
 import de.kuro.worldguard.platform.NeoForgeWorldGuardPlatform;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -16,17 +16,14 @@ import net.neoforged.neoforge.common.util.BlockSnapshot;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
 
 public final class BuildPermissionListener {
     private final NeoForgeWorldGuardPlatform platform;
-    private final EntityInteractionPair entityInteractions = new EntityInteractionPair();
 
     public BuildPermissionListener(NeoForgeWorldGuardPlatform platform) {
         this.platform = platform;
     }
-
-    public void forget(ServerPlayer player) { entityInteractions.forget(player); }
-    public void clear() { entityInteractions.clear(); }
 
     private WorldConfiguration enabled(ServerLevel level) {
         if (platform.getRegionContainer() == null) return null;
@@ -34,7 +31,7 @@ public final class BuildPermissionListener {
         return config.buildPermissions ? config : null;
     }
 
-    private static String name(ResourceLocation id) {
+    private static String name(Identifier id) {
         return id.getNamespace().equals("minecraft") ? id.getPath() : id.toString();
     }
 
@@ -54,11 +51,14 @@ public final class BuildPermissionListener {
     }
 
     @SubscribeEvent
-    public void onBreak(BlockEvent.BreakEvent event) {
+    public void onBreak(BreakBlockEvent event) {
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)
                 || !(event.getLevel() instanceof ServerLevel level)) return;
         WorldConfiguration config = enabled(level);
-        if (config != null && !block(player, config, event.getState(), "remove")) event.setCanceled(true);
+        if (config != null && !block(player, config, event.getState(), "remove")) {
+            event.setCanceled(true);
+            event.setNotifyClient(true);
+        }
     }
 
     @SubscribeEvent
@@ -82,8 +82,8 @@ public final class BuildPermissionListener {
     @SubscribeEvent
     public void onUseBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        WorldConfiguration config = enabled(player.serverLevel());
-        if (config != null && !block(player, config, player.serverLevel().getBlockState(event.getPos()), "interact")) {
+        WorldConfiguration config = enabled(player.level());
+        if (config != null && !block(player, config, player.level().getBlockState(event.getPos()), "interact")) {
             event.setCancellationResult(InteractionResult.FAIL);
             event.setCanceled(true);
         }
@@ -92,7 +92,7 @@ public final class BuildPermissionListener {
     @SubscribeEvent
     public void onUseItem(PlayerInteractEvent.RightClickItem event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        WorldConfiguration config = enabled(player.serverLevel());
+        WorldConfiguration config = enabled(player.level());
         ItemStack stack = event.getItemStack();
         if (config == null || stack.isEmpty() || stack.getItem() instanceof BlockItem) return;
         if (!permits(player, config, "item", name(BuiltInRegistries.ITEM.getKey(stack.getItem())), "use")) {
@@ -102,23 +102,9 @@ public final class BuildPermissionListener {
     }
 
     @SubscribeEvent
-    public void onUseEntity(PlayerInteractEvent.EntityInteractSpecific event) {
+    public void onUseEntity(PlayerInteractEvent.EntityInteract event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        WorldConfiguration config = enabled(player.serverLevel());
-        if (config != null && !permits(player, config, "entity",
-                name(BuiltInRegistries.ENTITY_TYPE.getKey(event.getTarget().getType())), "interact")) {
-            event.setCancellationResult(InteractionResult.FAIL);
-            event.setCanceled(true);
-        } else {
-            entityInteractions.record(player, event.getTarget(), event.getHand());
-        }
-    }
-
-    @SubscribeEvent
-    public void onUseEntityGeneral(PlayerInteractEvent.EntityInteract event) {
-        if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        if (entityInteractions.alreadyChecked(player, event.getTarget(), event.getHand())) return;
-        WorldConfiguration config = enabled(player.serverLevel());
+        WorldConfiguration config = enabled(player.level());
         if (config != null && !permits(player, config, "entity",
                 name(BuiltInRegistries.ENTITY_TYPE.getKey(event.getTarget().getType())), "interact")) {
             event.setCancellationResult(InteractionResult.FAIL);
@@ -129,7 +115,7 @@ public final class BuildPermissionListener {
     @SubscribeEvent
     public void onDamageEntity(AttackEntityEvent event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        WorldConfiguration config = enabled(player.serverLevel());
+        WorldConfiguration config = enabled(player.level());
         if (config != null && !permits(player, config, "entity",
                 name(BuiltInRegistries.ENTITY_TYPE.getKey(event.getTarget().getType())), "damage")) {
             event.setCanceled(true);

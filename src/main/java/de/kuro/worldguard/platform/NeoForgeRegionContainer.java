@@ -52,7 +52,7 @@ final class NeoForgeRegionContainer extends RegionContainer {
             super.migrate(migration);
         } finally {
             if (migration instanceof UUIDMigration uuidMigration) {
-                // Core 7.0.12 cancels its progress task but leaves this
+                // Core cancels its progress task but leaves this
                 // non-daemon timer alive after auto or command migration.
                 try {
                     Field timerField = UUIDMigration.class.getDeclaredField("timer");
@@ -67,13 +67,13 @@ final class NeoForgeRegionContainer extends RegionContainer {
 
 
     private static String storageId(World world) {
-        return storageId(NeoForgeAdapter.adapt(world));
+        return storageId(NeoForgeAdapter.get().toNativeWorld(world));
     }
 
     static String storageId(ServerLevel level) {
-        // '~' is not legal in ResourceLocation, so these substitutions are
+        // '~' is not legal in Identifier, so these substitutions are
         // reversible and safe for paths and Java thread-name format strings.
-        return level.dimension().location().toString().replace(":", "~").replace("/", "~s");
+        return level.dimension().identifier().toString().replace(":", "~").replace("/", "~s");
     }
 
     @Override

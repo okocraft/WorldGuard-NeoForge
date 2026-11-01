@@ -1,16 +1,12 @@
 plugins {
     id 'java-library'
-    id 'net.neoforged.moddev' version '2.0.147'
+    id 'net.neoforged.moddev' version '2.0.148'
 }
 
 version = mod_version
 group = mod_group_id
-
-base {
-    archivesName = mod_id
-}
-
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+base.archivesName = mod_id
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 repositories {
     maven {
@@ -24,55 +20,38 @@ repositories {
     mavenCentral()
 }
 
-// Minecraft 1.21.1 pins Guava to 32.1.2 while EngineHub's 7.3.x POM
-// requests 32.1.3. Use Minecraft's supplied library at runtime.
-configurations.configureEach {
-    resolutionStrategy.force 'com.google.guava:guava:32.1.2-jre'
-}
-
 neoForge {
     version = neo_version
-
     runs {
-        client {
-            client()
-        }
         server {
             server()
             programArgument '--nogui'
         }
     }
-
     mods {
-        worldguard {
-            sourceSet sourceSets.main
-        }
+        worldguard { sourceSet sourceSets.main }
     }
 }
 
 dependencies {
-    testImplementation 'com.google.guava:guava:32.1.2-jre'
-    // WorldEdit is a required, separately installed NeoForge mod.
-    implementation 'com.sk89q.worldedit:worldedit-neoforge-mc1.21:7.3.8'
-    additionalRuntimeClasspath 'com.sk89q.worldedit:worldedit-core:7.3.8'
-
-    // Package the official WorldGuard engine and its non-mod dependencies.
-    implementation 'com.sk89q.worldguard:worldguard-core:7.0.12'
-    implementation 'com.sk89q.worldguard.worldguard-libs:core:7.0.12'
+    implementation 'com.sk89q.worldedit:worldedit-neoforge-mc26.2:7.4.5'
+    implementation 'com.sk89q.worldguard:worldguard-core:7.0.19'
+    implementation 'com.sk89q.worldguard.worldguard-libs:core:7.0.19'
     jarJar(implementation('org.flywaydb:flyway-core:3.0')) {
         version { strictly '3.0' }
     }
     jarJar(implementation('org.yaml:snakeyaml:2.0')) {
         version { strictly '2.0' }
     }
-    jarJar(implementation('org.xerial:sqlite-jdbc:3.46.1.3')) {
-        version { strictly '3.46.1.3' }
+    jarJar(implementation('org.xerial:sqlite-jdbc:3.53.0.0')) {
+        version { strictly '[3.53.0.0,4.0)'; prefer '3.53.0.0' }
     }
-    additionalRuntimeClasspath 'com.sk89q.worldguard:worldguard-core:7.0.12'
-    additionalRuntimeClasspath 'com.sk89q.worldguard.worldguard-libs:core:7.0.12'
-    additionalRuntimeClasspath 'org.flywaydb:flyway-core:3.0'
-    additionalRuntimeClasspath 'org.yaml:snakeyaml:2.0'
-    additionalRuntimeClasspath 'org.xerial:sqlite-jdbc:3.46.1.3'
+    compileOnly 'net.luckperms:api:5.5'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+    testImplementation 'net.luckperms:api:5.5'
+    testImplementation platform('org.junit:junit-bom:6.1.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
@@ -90,79 +69,17 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
 
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
-
-tasks.register('regionSelfTest', JavaExec) {
-    group = 'verification'
-    description = 'Exercise Core region mutation, spatial queries, and save/load without a game server.'
-    dependsOn tasks.testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'de.kuro.worldguard.platform.RegionLifecycleSelfTest'
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+test {
+    useJUnitPlatform()
+    testLogging { exceptionFormat = 'full' }
 }
 
-tasks.register('protectionSemanticsSelfTest', JavaExec) {
-    group = 'verification'
-    description = 'Verify Core build, flag, group, priority, and inheritance behavior used by player protection.'
-    dependsOn tasks.testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'de.kuro.worldguard.platform.ProtectionSemanticsSelfTest'
-}
-
-tasks.register('environmentalConfigSelfTest', JavaExec) {
-    group = 'verification'
-    description = 'Verify WorldGuard environmental configuration defaults and overrides.'
-    dependsOn tasks.testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'de.kuro.worldguard.platform.EnvironmentalConfigSelfTest'
-}
-
-tasks.register('sessionSemanticsSelfTest', JavaExec) {
-    group = 'verification'
-    description = 'Verify Core session transitions, timed flags, natural player flags, and command filtering.'
-    dependsOn tasks.testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'de.kuro.worldguard.platform.SessionSemanticsSelfTest'
-}
-
-tasks.register('platformIntegrationSelfTest', JavaExec) {
-    group = 'verification'
-    description = 'Exercise Core custom flags, custom session handlers, global regions, and offline profiles.'
-    dependsOn tasks.testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'de.kuro.worldguard.platform.PlatformIntegrationSelfTest'
-}
-
-tasks.register('blacklistSelfTest', JavaExec) {
-    group = 'verification'
-    description = 'Verify Core blacklist parsing, exemptions, dimension isolation, and reload.'
-    dependsOn tasks.testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'de.kuro.worldguard.platform.BlacklistSelfTest'
-}
-
-tasks.register('corePerfBenchmark', JavaExec) {
-    group = 'verification'
-    description = 'Run a development-only WorldGuard Core spatial-query and blacklist workload.'
-    dependsOn tasks.testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'de.kuro.worldguard.platform.CorePerformanceBenchmark'
-    maxHeapSize = '2g'
-}
-
-tasks.named('check') {
-    dependsOn tasks.named('regionSelfTest')
-    dependsOn tasks.named('protectionSemanticsSelfTest')
-    dependsOn tasks.named('environmentalConfigSelfTest')
-    dependsOn tasks.named('sessionSemanticsSelfTest')
-    dependsOn tasks.named('platformIntegrationSelfTest')
-    dependsOn tasks.named('blacklistSelfTest')
-}
-
-// Core references WorldEdit game classes and must live in the mod module, not the
-// parent library module used for plain nested jars. Preserve the official bytecode.
+// Embed the official region engine in the mod module, sharing WorldEdit's types.
 configurations { embeddedEngine { transitive = false } }
 dependencies {
-    embeddedEngine 'com.sk89q.worldguard:worldguard-core:7.0.12'
-    embeddedEngine 'com.sk89q.worldguard.worldguard-libs:core:7.0.12'
+    embeddedEngine 'com.sk89q.worldguard:worldguard-core:7.0.19'
+    embeddedEngine 'com.sk89q.worldguard.worldguard-libs:core:7.0.19'
 }
 tasks.named('jar', Jar) {
     from({ configurations.embeddedEngine.collect { zipTree(it) } }) {
@@ -170,3 +87,16 @@ tasks.named('jar', Jar) {
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+sourceSets {
+    testmod {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+tasks.register('testmodJar', Jar) {
+    from sourceSets.testmod.output
+    archiveFileName = 'worldguard-test.jar'
+    destinationDirectory = layout.buildDirectory.dir('testmods')
+}
+tasks.named('check') { dependsOn tasks.named('testmodJar') }

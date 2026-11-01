@@ -21,10 +21,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.ExperienceOrb;
-import net.minecraft.world.level.portal.DimensionTransition;
+import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.common.util.TriState;
+import net.minecraft.util.TriState;
 import net.neoforged.neoforge.event.CommandEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
@@ -96,12 +96,12 @@ public final class SessionPlayerFlagsListener {
         ApplicableRegionSet set = platform.getRegionContainer().createQuery().getApplicableRegions(local.getLocation());
         Location spawn = set.queryValue(local, Flags.SPAWN_LOC);
         if (spawn == null) return;
-        ServerLevel destination = NeoForgeAdapter.adapt((World) spawn.getExtent());
-        DimensionTransition original = event.getDimensionTransition();
-        event.setDimensionTransition(new DimensionTransition(destination,
-                new Vec3(spawn.getX(), spawn.getY(), spawn.getZ()), original.speed(),
+        ServerLevel destination = NeoForgeAdapter.get().toNativeWorld((World) spawn.getExtent());
+        TeleportTransition original = event.getTeleportTransition();
+        event.setTeleportTransition(new TeleportTransition(destination,
+                new Vec3(spawn.getX(), spawn.getY(), spawn.getZ()), original.deltaMovement(),
                 spawn.getYaw(), spawn.getPitch(), original.missingRespawnBlock(),
-                original.postDimensionTransition()));
+                original.asPassenger(), Set.of(), original.postTeleportTransition()));
     }
 
     @SubscribeEvent
@@ -149,7 +149,7 @@ public final class SessionPlayerFlagsListener {
     public void onPickup(ItemEntityPickupEvent.Pre event) {
         if (!active() || !(event.getPlayer() instanceof ServerPlayer player)
                 || event.canPickup() == TriState.FALSE) return;
-        if (!decisions.context(player, player.serverLevel()).check(event.getItemEntity(),
+        if (!decisions.context(player, player.level()).check(event.getItemEntity(),
                 ProtectionDecisionEvent.Action.ITEM_PICKUP, PICKUP, "pick up that")) {
             event.setCanPickup(TriState.FALSE);
         }
@@ -158,14 +158,14 @@ public final class SessionPlayerFlagsListener {
     @SubscribeEvent
     public void onXpPickup(PlayerXpEvent.PickupXp event) {
         if (!active() || event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!decisions.context(player, player.serverLevel()).check(event.getOrb(),
+        if (!decisions.context(player, player.level()).check(event.getOrb(),
                 ProtectionDecisionEvent.Action.ITEM_PICKUP, PICKUP, "pick up XP")) event.setCanceled(true);
     }
 
     @SubscribeEvent
     public void onDrop(ItemTossEvent event) {
         if (!active() || event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)) return;
-        if (!decisions.context(player, player.serverLevel()).check(event.getEntity(),
+        if (!decisions.context(player, player.level()).check(event.getEntity(),
                 ProtectionDecisionEvent.Action.ITEM_DROP, DROP, "drop that")) event.setCanceled(true);
     }
 
@@ -173,7 +173,7 @@ public final class SessionPlayerFlagsListener {
     public void onBlockXp(BlockDropsEvent event) {
         if (!active() || event.getDroppedExperience() <= 0
                 || !(event.getBreaker() instanceof ServerPlayer player)) return;
-        if (!decisions.context(player, player.serverLevel()).check(event.getPos(),
+        if (!decisions.context(player, player.level()).check(event.getPos(),
                 ProtectionDecisionEvent.Action.EXP_DROP, XP, "drop XP")) event.setDroppedExperience(0);
     }
 
@@ -181,7 +181,7 @@ public final class SessionPlayerFlagsListener {
     public void onMobXp(LivingExperienceDropEvent event) {
         if (!active() || event.isCanceled() || event.getDroppedExperience() <= 0
                 || !(event.getAttackingPlayer() instanceof ServerPlayer player)) return;
-        if (!decisions.context(player, player.serverLevel()).check(event.getEntity(),
+        if (!decisions.context(player, player.level()).check(event.getEntity(),
                 ProtectionDecisionEvent.Action.EXP_DROP, XP, "drop XP")) event.setDroppedExperience(0);
     }
 

@@ -13,7 +13,8 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.PathfinderMob;
-import net.minecraft.world.entity.Saddleable;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.allay.Allay;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -23,8 +24,8 @@ import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FireworkRocketEntity;
-import net.minecraft.world.entity.vehicle.AbstractMinecartContainer;
-import net.minecraft.world.entity.vehicle.ChestBoat;
+import net.minecraft.world.entity.vehicle.minecart.AbstractMinecartContainer;
+import net.minecraft.world.entity.vehicle.boat.ChestBoat;
 import net.minecraft.world.entity.vehicle.VehicleEntity;
 import net.minecraft.world.item.BoatItem;
 import net.minecraft.world.item.MinecartItem;
@@ -60,7 +61,6 @@ public final class EntityProtectionListener {
     private static final StateFlag[] INTERACT_FIREWORK = {Flags.INTERACT, Flags.FIREWORK_DAMAGE};
 
     private final ProtectionDecisionService decisions;
-    private final Map<UUID, InteractionAttempt> interactionAttempts = new HashMap<>();
     private final Map<UUID, InteractionAttempt> rideAttempts = new HashMap<>();
     private final Map<UUID, InteractionAttempt> hangingAttackAttempts = new HashMap<>();
 
@@ -69,38 +69,20 @@ public final class EntityProtectionListener {
     }
 
     public void forget(ServerPlayer player) {
-        interactionAttempts.remove(player.getUUID());
         rideAttempts.remove(player.getUUID());
         hangingAttackAttempts.remove(player.getUUID());
     }
 
     public void reset() {
-        interactionAttempts.clear();
         rideAttempts.clear();
         hangingAttackAttempts.clear();
-    }
-
-    @SubscribeEvent
-    public void onInteractSpecific(PlayerInteractEvent.EntityInteractSpecific event) {
-        if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)
-                || !decisions.active()) return;
-        boolean allowed = interaction(player, event.getTarget());
-        interactionAttempts.put(player.getUUID(), new InteractionAttempt(event.getTarget().getId(),
-                event.getHand(), player.serverLevel().getGameTime(), allowed));
-        if (!allowed) {
-            event.setCancellationResult(InteractionResult.FAIL);
-            event.setCanceled(true);
-        }
     }
 
     @SubscribeEvent
     public void onInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)
                 || !decisions.active()) return;
-        InteractionAttempt previous = interactionAttempts.remove(player.getUUID());
-        boolean allowed = previous != null && previous.matches(event.getTarget(), event.getHand(),
-                player.serverLevel().getGameTime())
-                ? previous.allowed() : interaction(player, event.getTarget());
+        boolean allowed = interaction(player, event.getTarget());
         if (!allowed) {
             event.setCancellationResult(InteractionResult.FAIL);
             event.setCanceled(true);
@@ -108,9 +90,9 @@ public final class EntityProtectionListener {
     }
 
     private boolean interaction(ServerPlayer player, Entity target) {
-        ProtectionDecisionService.Context context = decisions.context(player, player.serverLevel());
+        ProtectionDecisionService.Context context = decisions.context(player, player.level());
         boolean rideable = target instanceof VehicleEntity
-                || target instanceof Saddleable saddleable && saddleable.isSaddled();
+                || target instanceof LivingEntity living && !living.getItemBySlot(EquipmentSlot.SADDLE).isEmpty();
         boolean allowed;
         if (target instanceof ItemFrame frame) {
             allowed = context.check(target, ProtectionDecisionEvent.Action.ENTITY_INTERACT,
@@ -124,7 +106,7 @@ public final class EntityProtectionListener {
         } else if (rideable) {
             allowed = context.check(target, ProtectionDecisionEvent.Action.RIDE, RIDE, "ride that");
             rideAttempts.put(player.getUUID(), new InteractionAttempt(target.getId(), null,
-                    player.serverLevel().getGameTime(), allowed));
+                    player.level().getGameTime(), allowed));
         } else if (isHostileOrAmbient(target) || target instanceof Player) {
             allowed = context.checkExplicit(target, ProtectionDecisionEvent.Action.ENTITY_INTERACT,
                     BUILD, "use that");
@@ -143,9 +125,9 @@ public final class EntityProtectionListener {
         Entity target = event.getEntityBeingMounted();
         InteractionAttempt previous = rideAttempts.remove(player.getUUID());
         boolean allowed = previous != null && previous.matches(target, null,
-                player.serverLevel().getGameTime())
+                player.level().getGameTime())
                 ? previous.allowed()
-                : decisions.context(player, player.serverLevel()).check(target,
+                : decisions.context(player, player.level()).check(target,
                         ProtectionDecisionEvent.Action.RIDE, RIDE, "ride that");
         if (!allowed) event.setCanceled(true);
     }
@@ -169,7 +151,7 @@ public final class EntityProtectionListener {
             event.setCanceled(true);
         } else {
             hangingAttackAttempts.put(player.getUUID(), new InteractionAttempt(target.getId(), null,
-                    player.serverLevel().getGameTime(), true));
+                    player.level().getGameTime(), true));
         }
     }
 
@@ -222,9 +204,9 @@ public final class EntityProtectionListener {
     public void onMinecartPlace(PlayerInteractEvent.RightClickBlock event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)
                 || !(event.getItemStack().getItem() instanceof MinecartItem)
-                || !player.serverLevel().getBlockState(event.getPos()).is(BlockTags.RAILS)
+                || !player.level().getBlockState(event.getPos()).is(BlockTags.RAILS)
                 || !decisions.active()) return;
-        if (!decisions.context(player, player.serverLevel()).check(event.getPos(),
+        if (!decisions.context(player, player.level()).check(event.getPos(),
                 ProtectionDecisionEvent.Action.VEHICLE_PLACE, VEHICLE_PLACE, "place vehicles")) {
             event.setCancellationResult(InteractionResult.FAIL);
             event.setCanceled(true);
@@ -235,7 +217,7 @@ public final class EntityProtectionListener {
     public void onBoatPlace(PlayerInteractEvent.RightClickItem event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)
                 || !(event.getItemStack().getItem() instanceof BoatItem) || !decisions.active()) return;
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = player.level();
         Vec3 start = player.getEyePosition();
         Vec3 end = start.add(player.getViewVector(1.0f).scale(player.blockInteractionRange()));
         BlockHitResult hit = level.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE,

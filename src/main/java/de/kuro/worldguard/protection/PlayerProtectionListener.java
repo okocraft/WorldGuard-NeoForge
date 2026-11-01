@@ -42,6 +42,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.UseItemOnBlockEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
 
 public final class PlayerProtectionListener {
     private static final StateFlag[] BREAK = {Flags.BLOCK_BREAK};
@@ -74,12 +75,13 @@ public final class PlayerProtectionListener {
     }
 
     @SubscribeEvent
-    public void onBreak(BlockEvent.BreakEvent event) {
+    public void onBreak(BreakBlockEvent event) {
         if (event.isCanceled() || !(event.getPlayer() instanceof ServerPlayer player)
                 || !(event.getLevel() instanceof ServerLevel level) || !decisions.active()) return;
         ProtectionDecisionService.Context context = decisions.context(player, level);
         if (!context.check(event.getPos(), ProtectionDecisionEvent.Action.BREAK, BREAK, "break that block")) {
             event.setCanceled(true);
+            event.setNotifyClient(true);
         }
     }
 
@@ -117,7 +119,7 @@ public final class PlayerProtectionListener {
     @SubscribeEvent
     public void onRightClick(PlayerInteractEvent.RightClickBlock event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player) || !decisions.active()) return;
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = player.level();
         BlockPos pos = event.getPos();
         BlockState state = level.getBlockState(pos);
         ItemStack item = event.getItemStack();
@@ -139,7 +141,7 @@ public final class PlayerProtectionListener {
             }
             return;
         } else if (isIgnition(item) && WorldGuard.getInstance().getPlatform().getGlobalStateManager()
-                .get(NeoForgeAdapter.adapt(level)).blockLighter) {
+                .get(NeoForgeAdapter.get().fromNativeWorld(level)).blockLighter) {
             deny(event);
             return;
         } else if (state.is(Blocks.TNT) && isIgnition(item)) {
@@ -195,7 +197,7 @@ public final class PlayerProtectionListener {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)
                 || !decisions.active() || !isBucket(event.getItemStack())) return;
         // A fluid surface often yields RightClickItem rather than RightClickBlock.
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = player.level();
         Vec3 start = player.getEyePosition();
         Vec3 end = start.add(player.getViewVector(1.0f).scale(player.blockInteractionRange()));
         BlockHitResult hit = level.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE,
@@ -220,12 +222,12 @@ public final class PlayerProtectionListener {
                 || !(event.getEntity() instanceof ServerPlayer player) || !decisions.active()) return;
         // The cancellable BreakEvent handles mining. This covers Block#attack,
         // which may mutate cake or unknown modded blocks before a break occurs.
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = player.level();
         BlockState state = level.getBlockState(event.getPos());
         if (state.getBlock() instanceof net.minecraft.world.level.block.CakeBlock
                 || state.getBlock() instanceof BigDripleafBlock
-                || !state.getBlock().builtInRegistryHolder().key().location().getNamespace().equals("minecraft")) {
-            if (!decisions.context(player, player.serverLevel()).check(event.getPos(),
+                || !state.getBlock().builtInRegistryHolder().key().identifier().getNamespace().equals("minecraft")) {
+            if (!decisions.context(player, player.level()).check(event.getPos(),
                     ProtectionDecisionEvent.Action.USE,
                     state.getBlock() instanceof net.minecraft.world.level.block.CakeBlock ? BUILD_ONLY
                             : state.getBlock() instanceof BigDripleafBlock ? DRIPLEAF : INTERACT,
@@ -257,13 +259,13 @@ public final class PlayerProtectionListener {
         if (item.getItem() instanceof BoatItem || item.getItem() instanceof MinecartItem) return;
         if (item.isEmpty() || item.getItem() instanceof BlockItem || isBucket(item) || isIgnition(item)
                 || item.is(Items.BONE_MEAL)) return;
-        boolean modded = !item.getItem().builtInRegistryHolder().key().location().getNamespace().equals("minecraft");
+        boolean modded = !item.getItem().builtInRegistryHolder().key().identifier().getNamespace().equals("minecraft");
         if (event.getUsePhase() != (modded ? UseItemOnBlockEvent.UsePhase.ITEM_BEFORE_BLOCK
                 : UseItemOnBlockEvent.UsePhase.ITEM_AFTER_BLOCK)) return;
         // Upstream conservatively treats unknown items applied to blocks as terrain modifications.
-        if (!decisions.context(player, player.serverLevel()).check(event.getPos(),
+        if (!decisions.context(player, player.level()).check(event.getPos(),
                 ProtectionDecisionEvent.Action.ITEM_ON_BLOCK, PLACE, "use that item")) {
-            event.cancelWithResult(net.minecraft.world.ItemInteractionResult.FAIL);
+            event.cancelWithResult(InteractionResult.FAIL);
         }
     }
 
@@ -272,7 +274,7 @@ public final class PlayerProtectionListener {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)
                 || !(event.getLevel() instanceof ServerLevel level) || !decisions.active()) return;
         if (WorldGuard.getInstance().getPlatform().getGlobalStateManager()
-                .get(NeoForgeAdapter.adapt(level)).disablePlayerCropTrampling) {
+                .get(NeoForgeAdapter.get().fromNativeWorld(level)).disablePlayerCropTrampling) {
             event.setCanceled(true);
             return;
         }
@@ -301,12 +303,12 @@ public final class PlayerProtectionListener {
                 || state.is(Blocks.CHIPPED_ANVIL) || state.is(Blocks.DAMAGED_ANVIL)) return false;
         if (entity instanceof MenuProvider) return true;
         return state.getMenuProvider(level, pos) != null
-                && !state.getBlock().builtInRegistryHolder().key().location().getNamespace().equals("minecraft");
+                && !state.getBlock().builtInRegistryHolder().key().identifier().getNamespace().equals("minecraft");
     }
 
     private static boolean isInteractive(ServerLevel level, BlockPos pos, BlockState state) {
         return state.getMenuProvider(level, pos) != null
-                || !state.getBlock().builtInRegistryHolder().key().location().getNamespace().equals("minecraft")
+                || !state.getBlock().builtInRegistryHolder().key().identifier().getNamespace().equals("minecraft")
                 || state.is(BlockTags.BUTTONS) || state.is(BlockTags.DOORS)
                 || state.is(BlockTags.TRAPDOORS) || state.is(BlockTags.FENCE_GATES)
                 || state.is(BlockTags.PRESSURE_PLATES)

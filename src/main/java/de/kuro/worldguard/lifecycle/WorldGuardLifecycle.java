@@ -5,7 +5,7 @@ import com.sk89q.worldedit.command.util.FutureProgressListener;
 import com.sk89q.worldedit.event.platform.PlatformReadyEvent;
 import com.sk89q.worldedit.event.platform.PlatformUnreadyEvent;
 import com.sk89q.worldedit.neoforge.NeoForgeAdapter;
-import com.sk89q.worldedit.neoforge.NeoForgeWorldEdit;
+import com.sk89q.worldedit.neoforge.internal.NeoForgeWorldEdit;
 import com.sk89q.worldedit.util.eventbus.Subscribe;
 import com.sk89q.worldguard.WorldGuard;
 import com.sk89q.worldguard.protection.flags.registry.SimpleFlagRegistry;
@@ -78,7 +78,7 @@ public final class WorldGuardLifecycle {
 
     @Subscribe
     public void onWorldEditReady(PlatformReadyEvent event) {
-        if (NeoForgeWorldEdit.inst == null || event.getPlatform() != NeoForgeWorldEdit.inst.getPlatform()) {
+        if (event.getPlatform() != NeoForgeWorldEdit.getPlatform()) {
             return;
         }
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
@@ -135,7 +135,7 @@ public final class WorldGuardLifecycle {
 
     @Subscribe
     public void onWorldEditUnready(PlatformUnreadyEvent event) {
-        if (NeoForgeWorldEdit.inst != null && event.getPlatform() == NeoForgeWorldEdit.inst.getPlatform()) {
+        if (event.getPlatform() == NeoForgeWorldEdit.getPlatform()) {
             stop();
         }
     }
@@ -144,7 +144,7 @@ public final class WorldGuardLifecycle {
     public void onLevelLoad(LevelEvent.Load event) {
         if (activeServer != null && event.getLevel() instanceof ServerLevel level
                 && level.getServer() == activeServer) {
-            platform.loadLevel(NeoForgeAdapter.adapt(level));
+            platform.loadLevel(NeoForgeAdapter.get().fromNativeWorld(level));
         }
     }
 
@@ -152,7 +152,7 @@ public final class WorldGuardLifecycle {
     public void onLevelUnload(LevelEvent.Unload event) {
         if (activeServer != null && event.getLevel() instanceof ServerLevel level
                 && level.getServer() == activeServer) {
-            platform.unloadLevel(NeoForgeAdapter.adapt(level));
+            platform.unloadLevel(NeoForgeAdapter.get().fromNativeWorld(level));
         }
     }
 
@@ -161,7 +161,7 @@ public final class WorldGuardLifecycle {
         if (activeServer != null && event.getLevel() instanceof ServerLevel level
                 && level.getServer() == activeServer) {
             var pos = event.getChunk().getPos();
-            platform.loadChunk(level, pos.x, pos.z);
+            platform.loadChunk(level, pos.x(), pos.z());
         }
     }
 
@@ -170,7 +170,7 @@ public final class WorldGuardLifecycle {
         if (activeServer != null && event.getLevel() instanceof ServerLevel level
                 && level.getServer() == activeServer) {
             var pos = event.getChunk().getPos();
-            platform.unloadChunk(level, pos.x, pos.z);
+            platform.unloadChunk(level, pos.x(), pos.z());
         }
     }
 
@@ -210,8 +210,6 @@ public final class WorldGuardLifecycle {
             movement.forget(player);
             platform.removePlayer(player);
             entityProtection.forget(player);
-            blacklist.forget(player);
-            buildPermissions.forget(player);
         }
     }
 
@@ -256,8 +254,6 @@ public final class WorldGuardLifecycle {
             activeServer = null;
             protection.reset();
             entityProtection.reset();
-            blacklist.clear();
-            buildPermissions.clear();
             movement.clear();
             sessionTicks = 0;
             platform.unbind();
@@ -267,7 +263,7 @@ public final class WorldGuardLifecycle {
         }
     }
 
-    /** WorldEdit 7.3.8 has no public shutdown hook for this non-daemon static timer. */
+    /** WorldEdit has no public shutdown hook for this non-daemon static timer. */
     private static void cancelWorldEditProgressTimer() {
         try {
             Field timerField = FutureProgressListener.class.getDeclaredField("timer");

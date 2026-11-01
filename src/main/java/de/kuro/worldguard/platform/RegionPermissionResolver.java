@@ -1,8 +1,7 @@
 package de.kuro.worldguard.platform;
 
-import com.sk89q.worldedit.neoforge.NeoForgePermissionsProvider;
-import com.sk89q.worldedit.neoforge.NeoForgeWorldEdit;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.fml.ModList;
 
 public interface RegionPermissionResolver {
     boolean hasPermission(ServerPlayer player, String node);
@@ -18,15 +17,16 @@ public interface RegionPermissionResolver {
         return new String[0];
     }
 
-    /** Capture WorldEdit's replaceable provider once at load/reload, not on every action. */
     static RegionPermissionResolver defaultResolver(NeoForgeWorldGuardPlatform platform) {
-        NeoForgePermissionsProvider provider = NeoForgeWorldEdit.inst.getPermissionsProvider();
-        return (player, node) -> {
-            if (!(provider instanceof NeoForgePermissionsProvider.VanillaPermissionsProvider)) {
-                return provider.hasPermission(player, node);
-            }
-            return platform.getGlobalStateManager().get(platform.adaptWorld(player.serverLevel())).opPermissions
-                    && player.server.getPlayerList().isOp(player.getGameProfile());
-        };
+        if (ModList.get().isLoaded("luckperms")) {
+            return new LuckPermsRegionPermissionResolver(platform);
+        }
+        return (player, node) -> defaultPermission(platform, player);
     }
+
+    static boolean defaultPermission(NeoForgeWorldGuardPlatform platform, ServerPlayer player) {
+        return platform.getGlobalStateManager().get(platform.adaptWorld(player.level())).opPermissions
+                && player.level().getServer().getPlayerList().isOp(player.nameAndId());
+    }
+
 }

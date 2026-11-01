@@ -1,7 +1,7 @@
 {
   "required": true,
   "package": "de.kuro.worldguard.mixin",
-  "compatibilityLevel": "JAVA_21",
-  "mixins": ["FlowingFluidMixin", "FireBlockMixin", "NaturalFadeMixin", "FrostedIceMixin", "CoralFadeMixin", "FarmDryMixin", "FarmMoistureMixin", "NaturalSpreadMixin", "MushroomVineMixin", "PrecipitationMixin", "EndermanTakeMixin", "EndermanLeaveMixin", "SnowGolemMixin", "RavagerMixin", "EnchantmentReplaceBlockMixin", "SculkBlockMixin", "SculkVeinMixin", "DripstoneGrowthMixin", "BigDripleafUseMixin", "TurtleEggTrampleMixin", "PhysicalBlockUseMixin", "TreeGrowerMixin", "HugeMushroomMixin", "HugeFungusMixin", "DispenserBlacklistMixin", "ThrownPotionSplashMixin", "PlayerPacketMovementMixin", "PlayerDimensionMovementMixin", "PlayerDirectTeleportMixin", "PlayerChatDeliveryMixin", "PlayerFoodRulesMixin", "PlayerExhaustionMixin", "PlayerDeathMessageMixin"],
+  "compatibilityLevel": "JAVA_25",
+  "mixins": ["FlowingFluidMixin", "FireBlockMixin", "NaturalFadeMixin", "FrostedIceMixin", "CoralFadeMixin", "FarmDryMixin", "FarmMoistureMixin", "NaturalSpreadMixin", "MushroomVineMixin", "PrecipitationMixin", "EndermanTakeMixin", "EndermanLeaveMixin", "SnowGolemMixin", "RavagerMixin", "EnchantmentReplaceBlockMixin", "SculkBlockMixin", "SculkVeinMixin", "SculkVeinSpreadMixin", "DripstoneGrowthMixin", "BigDripleafUseMixin", "TurtleEggTrampleMixin", "PhysicalBlockUseMixin", "TreeGrowerMixin", "HugeMushroomMixin", "HugeFungusMixin", "DispenserBlacklistMixin", "ThrownPotionSplashMixin", "PlayerPacketMovementMixin", "PlayerDimensionMovementMixin", "PlayerDirectTeleportMixin", "PlayerChatDeliveryMixin", "PlayerFoodRulesMixin", "PlayerExhaustionMixin", "PlayerDeathMessageMixin", "FoodDataAccessor"],
   "injectors": {"defaultRequire": 1}
 }
