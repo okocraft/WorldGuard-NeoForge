@@ -45,6 +45,9 @@ public final class ProtectionEventBusTestMod {
 
     private boolean ran;
     private int readyTicks;
+    private DqmMeraPvpTest pendingMera;
+    private Throwable rangeFailure;
+    private Throwable bomieFailure;
 
     public ProtectionEventBusTestMod() {
         NeoForge.EVENT_BUS.register(this);
@@ -52,6 +55,27 @@ public final class ProtectionEventBusTestMod {
 
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
+        if (pendingMera != null) {
+            try {
+                if (pendingMera.tick()) {
+                    pendingMera = null;
+                    if (rangeFailure != null || bomieFailure != null) {
+                        IllegalStateException aggregate = new IllegalStateException("DQM protection tests failed");
+                        if (rangeFailure != null) aggregate.addSuppressed(rangeFailure);
+                        if (bomieFailure != null) aggregate.addSuppressed(bomieFailure);
+                        throw aggregate;
+                    }
+                    System.out.println("WG_PROTECTION_TESTS_PASSED");
+                }
+            } catch (Throwable failure) {
+                if (failure.getSuppressed().length == 0) {
+                    if (rangeFailure != null && rangeFailure != failure) failure.addSuppressed(rangeFailure);
+                    if (bomieFailure != null && bomieFailure != failure) failure.addSuppressed(bomieFailure);
+                }
+                fail(event.getServer(), failure);
+            }
+            return;
+        }
         if (ran) return;
         MinecraftServer server = event.getServer();
         if (!WorldGuardNeoForge.isReady() || WorldGuard.getInstance().getPlatform().getRegionContainer()
@@ -67,8 +91,26 @@ public final class ProtectionEventBusTestMod {
             if (ModList.get().isLoaded("luckperms")) {
                 LuckPermsProtectionTest.run(server.overworld());
             }
+            if (ModList.get().isLoaded("dqmvii")) {
+                try {
+                    DqmRangeBreakTest.run(server.overworld());
+                } catch (Throwable failure) {
+                    rangeFailure = failure;
+                    System.err.println("DQM_RANGE_RESULT " + failure);
+                }
+                try {
+                    DqmBomiePvpTest.run(server.overworld());
+                } catch (Throwable failure) {
+                    bomieFailure = failure;
+                    System.err.println("DQM_BOMIE_RESULT " + failure);
+                }
+                pendingMera = DqmMeraPvpTest.start(server.overworld());
+                return;
+            }
             System.out.println("WG_PROTECTION_TESTS_PASSED");
         } catch (Throwable failure) {
+            if (rangeFailure != null && rangeFailure != failure) failure.addSuppressed(rangeFailure);
+            if (bomieFailure != null && bomieFailure != failure) failure.addSuppressed(bomieFailure);
             fail(server, failure);
         }
     }
