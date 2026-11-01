@@ -21,6 +21,7 @@ import net.minecraft.world.level.material.FluidState;
 public final class EnvironmentalHooks {
     private static EnvironmentalProtection protection;
     private static ProtectionDecisionService decisions;
+    private static EntityProtectionListener entityPermissions;
     private static final StateFlag[] FROST = {Flags.FROSTED_ICE_FORM};
     private static final StateFlag[] POTION = {Flags.POTION_SPLASH};
     private static final StateFlag[] DRIPLEAF = {Flags.USE_DRIPLEAF};
@@ -29,11 +30,20 @@ public final class EnvironmentalHooks {
 
     private EnvironmentalHooks() {}
 
-    public static void install(EnvironmentalProtection service, ProtectionDecisionService playerDecisions) {
+    public static void install(EnvironmentalProtection service, ProtectionDecisionService playerDecisions,
+                               EntityProtectionListener entityProtection) {
         protection = service;
         decisions = playerDecisions;
+        entityPermissions = entityProtection;
     }
-    public static void uninstall() { protection = null; decisions = null; }
+    public static void uninstall() { protection = null; decisions = null; entityPermissions = null; }
+
+    /** Player-caused status and burning effects share ordinary damage permissions. */
+    public static boolean offensiveEffect(Entity caster, LivingEntity target) {
+        if (decisions == null || !decisions.active()) return true;
+        ServerPlayer player = EntityCauseResolver.player(caster);
+        return player == null || entityPermissions.permitsDamage(player, target, player.damageSources().magic());
+    }
 
     public static boolean fluid(LevelAccessor access, BlockPos source, BlockPos target,
                                 BlockState oldState, FluidState fluid) {

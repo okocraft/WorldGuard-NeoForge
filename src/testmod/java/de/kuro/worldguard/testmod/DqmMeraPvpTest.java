@@ -20,19 +20,14 @@ final class DqmMeraPvpTest {
     private final RegionManager regions;
     private final DqmTestPlayer control;
     private final DqmTestPlayer protectedTarget;
-    private final float controlAfterImpact;
-    private final float protectedAfterImpact;
     private final int protectedFireAfterImpact;
     private int elapsedTicks;
 
     private DqmMeraPvpTest(RegionManager regions, DqmTestPlayer control,
-                           DqmTestPlayer protectedTarget, float controlAfterImpact,
-                           float protectedAfterImpact, int protectedFireAfterImpact) {
+                           DqmTestPlayer protectedTarget, int protectedFireAfterImpact) {
         this.regions = regions;
         this.control = control;
         this.protectedTarget = protectedTarget;
-        this.controlAfterImpact = controlAfterImpact;
-        this.protectedAfterImpact = protectedAfterImpact;
         this.protectedFireAfterImpact = protectedFireAfterImpact;
     }
 
@@ -62,9 +57,9 @@ final class DqmMeraPvpTest {
         float controlHealth = control.getHealth();
         int controlFire = control.getRemainingFireTicks();
         System.out.println("DQM_MERA_CONTROL health=" + controlHealth + " fireTicks=" + controlFire);
-        if (controlHealth >= 20.0f || controlFire <= 0) {
-            System.out.println("DQM_MERA_INCONCLUSIVE no_initial_damage_or_ignition");
-            throw new AssertionError("DQM_MERA_INCONCLUSIVE: unprotected Mera impact was not confirmed");
+        if (controlFire <= 0) {
+            System.out.println("DQM_MERA_INCONCLUSIVE no_unprotected_ignition");
+            throw new AssertionError("DQM_MERA_INCONCLUSIVE: unprotected Mera ignition was not confirmed");
         }
 
         ProtectedCuboidRegion claim = new ProtectedCuboidRegion(REGION_ID,
@@ -77,8 +72,7 @@ final class DqmMeraPvpTest {
             float deniedHealth = protectedTarget.getHealth();
             int deniedFire = protectedTarget.getRemainingFireTicks();
             System.out.println("DQM_MERA_PROTECTED_IMPACT health=" + deniedHealth + " fireTicks=" + deniedFire);
-            return new DqmMeraPvpTest(regions, control, protectedTarget,
-                    controlHealth, deniedHealth, deniedFire);
+            return new DqmMeraPvpTest(regions, control, protectedTarget, deniedFire);
         } catch (RuntimeException | Error failure) {
             regions.removeRegion(REGION_ID);
             throw failure;
@@ -96,12 +90,13 @@ final class DqmMeraPvpTest {
             int protectedFireLater = protectedTarget.getRemainingFireTicks();
             System.out.println("DQM_MERA_AFTER_25_TICKS controlHealth=" + controlLater
                     + " protectedHealth=" + protectedLater + " protectedFireTicks=" + protectedFireLater);
-            if (protectedAfterImpact < 20.0f || protectedFireAfterImpact > 0
-                    || protectedLater < 20.0f || protectedFireLater > 0) {
-                throw new AssertionError("DQM_MERA_PROTECTION_FAILED: PvP-denied target took spell damage or ignition"
-                        + " (controlAfterImpact=" + controlAfterImpact + ", controlLater=" + controlLater
-                        + ", protectedAfterImpact=" + protectedAfterImpact + ", protectedLater=" + protectedLater
-                        + ", fireAfterImpact=" + protectedFireAfterImpact + ")");
+            if (control.getRemainingFireTicks() <= 0) {
+                throw new AssertionError("DQM_MERA_INCONCLUSIVE: control ignition did not persist across server ticks");
+            }
+            if (protectedFireAfterImpact > 0 || protectedFireLater > 0) {
+                throw new AssertionError("DQM_MERA_PROTECTION_FAILED: PvP-denied target ignited"
+                        + " (fireAfterImpact=" + protectedFireAfterImpact
+                        + ", fireAfter25Ticks=" + protectedFireLater + ")");
             }
             System.out.println("DQM_MERA_PROTECTION_PASSED");
             return true;

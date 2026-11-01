@@ -30,5 +30,5 @@ const assets = [
   }
 ];
 await Promise.all(assets.map(asset => download(asset.url, join(runtime.mods, asset.name), asset.digest.slice(7))));
-await boot(runtime, ['say WG_SMOKE_FINISHED'], '', ['DQM_RANGE_PROTECTION_PASSED', 'DQM_BOMIE_PROTECTION_PASSED', 'DQM_MERA_PROTECTION_PASSED'], 300000);
+await boot(runtime, ['say WG_SMOKE_FINISHED'], '', ['DQM_RANGE_PROTECTION_PASSED', 'DQM_FLUID_PROTECTION_PASSED', 'DQM_BUILD_PROTECTION_PASSED', 'DQM_BOMIE_PROTECTION_PASSED', 'DQM_KIARI_PROTECTION_PASSED', 'DQM_MERA_PROTECTION_PASSED'], 300000);
 console.log('Real DQM effect protection tests passed.');

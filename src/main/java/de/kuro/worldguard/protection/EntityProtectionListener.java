@@ -139,14 +139,14 @@ public final class EntityProtectionListener {
         DamageSource source = event.getSource();
         ServerPlayer attacker = EntityCauseResolver.player(source);
         if (attacker == null) return;
-        if (!damage(attacker, event.getEntity(), source)) event.setCanceled(true);
+        if (!permitsDamage(attacker, event.getEntity(), source)) event.setCanceled(true);
     }
 
     @SubscribeEvent
     public void onHangingAttack(AttackEntityEvent event) {
         if (event.isCanceled() || !(event.getEntity() instanceof ServerPlayer player)
                 || !(event.getTarget() instanceof BlockAttachedEntity target) || !decisions.active()) return;
-        boolean allowed = damage(player, target, player.damageSources().playerAttack(player));
+        boolean allowed = permitsDamage(player, target, player.damageSources().playerAttack(player));
         if (!allowed) {
             event.setCanceled(true);
         } else {
@@ -168,12 +168,12 @@ public final class EntityProtectionListener {
             if (previous != null && previous.matches(target, null,
                     ((ServerLevel) target.level()).getGameTime())) return;
         }
-        if (!damage(attacker, target, event.getSource())) {
+        if (!permitsDamage(attacker, target, event.getSource())) {
             event.setInvulnerable(true);
         }
     }
 
-    private boolean damage(ServerPlayer attacker, Entity target, DamageSource source) {
+    boolean permitsDamage(ServerPlayer attacker, Entity target, DamageSource source) {
         ProtectionDecisionService.Context context = decisions.context(attacker, (ServerLevel) target.level());
         boolean firework = source.getDirectEntity() instanceof FireworkRocketEntity;
         if (target instanceof ServerPlayer defender && attacker != defender) {

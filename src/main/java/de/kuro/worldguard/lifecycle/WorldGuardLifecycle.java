@@ -58,7 +58,7 @@ public final class WorldGuardLifecycle {
     private int sessionTicks;
 
     public void register() {
-        EnvironmentalHooks.install(environmental, decisions);
+        EnvironmentalHooks.install(environmental, decisions, entityProtection);
         movement.install();
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(protection);

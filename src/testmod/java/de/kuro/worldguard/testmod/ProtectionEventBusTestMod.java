@@ -29,6 +29,8 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /** Dedicated-server event-bus integration fixture. Packaged only in the smoke-test mod. */
@@ -46,8 +48,7 @@ public final class ProtectionEventBusTestMod {
     private boolean ran;
     private int readyTicks;
     private DqmMeraPvpTest pendingMera;
-    private Throwable rangeFailure;
-    private Throwable bomieFailure;
+    private final List<Throwable> dqmFailures = new ArrayList<>();
 
     public ProtectionEventBusTestMod() {
         NeoForge.EVENT_BUS.register(this);
@@ -59,18 +60,16 @@ public final class ProtectionEventBusTestMod {
             try {
                 if (pendingMera.tick()) {
                     pendingMera = null;
-                    if (rangeFailure != null || bomieFailure != null) {
+                    if (!dqmFailures.isEmpty()) {
                         IllegalStateException aggregate = new IllegalStateException("DQM protection tests failed");
-                        if (rangeFailure != null) aggregate.addSuppressed(rangeFailure);
-                        if (bomieFailure != null) aggregate.addSuppressed(bomieFailure);
+                        dqmFailures.forEach(aggregate::addSuppressed);
                         throw aggregate;
                     }
                     System.out.println("WG_PROTECTION_TESTS_PASSED");
                 }
             } catch (Throwable failure) {
                 if (failure.getSuppressed().length == 0) {
-                    if (rangeFailure != null && rangeFailure != failure) failure.addSuppressed(rangeFailure);
-                    if (bomieFailure != null && bomieFailure != failure) failure.addSuppressed(bomieFailure);
+                    attachFailures(failure);
                 }
                 fail(event.getServer(), failure);
             }
@@ -95,23 +94,46 @@ public final class ProtectionEventBusTestMod {
                 try {
                     DqmRangeBreakTest.run(server.overworld());
                 } catch (Throwable failure) {
-                    rangeFailure = failure;
-                    System.err.println("DQM_RANGE_RESULT " + failure);
+                    recordDqmFailure("RANGE", failure);
+                }
+                try {
+                    DqmRangeFluidTest.run(server.overworld());
+                } catch (Throwable failure) {
+                    recordDqmFailure("FLUID", failure);
+                }
+                try {
+                    DqmMagicBuildTest.run(server.overworld());
+                } catch (Throwable failure) {
+                    recordDqmFailure("BUILD", failure);
                 }
                 try {
                     DqmBomiePvpTest.run(server.overworld());
                 } catch (Throwable failure) {
-                    bomieFailure = failure;
-                    System.err.println("DQM_BOMIE_RESULT " + failure);
+                    recordDqmFailure("BOMIE", failure);
+                }
+                try {
+                    DqmKiariPvpTest.run(server.overworld());
+                } catch (Throwable failure) {
+                    recordDqmFailure("KIARI", failure);
                 }
                 pendingMera = DqmMeraPvpTest.start(server.overworld());
                 return;
             }
             System.out.println("WG_PROTECTION_TESTS_PASSED");
         } catch (Throwable failure) {
-            if (rangeFailure != null && rangeFailure != failure) failure.addSuppressed(rangeFailure);
-            if (bomieFailure != null && bomieFailure != failure) failure.addSuppressed(bomieFailure);
+            attachFailures(failure);
             fail(server, failure);
+        }
+    }
+
+    private void recordDqmFailure(String caseName, Throwable failure) {
+        dqmFailures.add(failure);
+        System.err.println("DQM_" + caseName + "_RESULT " + failure);
+    }
+
+    private void attachFailures(Throwable target) {
+        for (Throwable failure : dqmFailures) {
+            if (failure != target) target.addSuppressed(failure);
         }
     }
 
